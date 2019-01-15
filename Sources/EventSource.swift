@@ -47,12 +47,13 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.receivedString = nil
         self.receivedDataBuffer = NSMutableData()
 
-        let port = String(self.url.port ?? 80)
+        let port = self.url.port != nil ? String(self.url.port!) : ""
 		let relativePath = self.url.relativePath
 		let host = self.url.host ?? ""
-        let scheme = self.url.scheme ?? ""
 
-		self.uniqueIdentifier = "\(scheme).\(host).\(port).\(relativePath)"
+        // This key must be kept the same for legacy reasons. Otherwise the stream will reconnect from the beginning.
+        // TODO: Nuke this library and replace it with something sane
+		self.uniqueIdentifier = "\(self.url.scheme).\(host).\(port).\(relativePath)"
 		self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
 
         super.init()
