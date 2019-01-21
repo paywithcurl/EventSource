@@ -15,11 +15,10 @@ public enum EventSourceState {
 }
 
 open class EventSource: NSObject, URLSessionDataDelegate {
-	static let DefaultsKey = "com.inaka.eventSource.lastEventId"
+    static let DefaultsKey = "com.inaka.eventSource.lastEventId"
 
     let url: URL
-	fileprivate let lastEventIDKey: String
-    fileprivate let receivedString: NSString?
+    fileprivate let lastEventIDKey: String
     fileprivate var onOpenCallback: (() -> Void)?
     fileprivate var onErrorCallback: ((NSError?) -> Void)?
     fileprivate var onMessageCallback: ((_ id: String?, _ event: String?, _ data: String?) -> Void)?
@@ -44,17 +43,16 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.headers = headers
         self.readyState = EventSourceState.closed
         self.operationQueue = OperationQueue()
-        self.receivedString = nil
         self.receivedDataBuffer = NSMutableData()
 
         let port = self.url.port != nil ? String(self.url.port!) : ""
-		let relativePath = self.url.relativePath
-		let host = self.url.host ?? ""
+        let relativePath = self.url.relativePath
+        let host = self.url.host ?? ""
 
         // This key must be kept the same for legacy reasons. Otherwise the stream will reconnect from the beginning.
         // TODO: Nuke this library and replace it with something sane
-		self.uniqueIdentifier = "\(self.url.scheme).\(host).\(port).\(relativePath)"
-		self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
+        self.uniqueIdentifier = "\(self.url.scheme).\(host).\(port).\(relativePath)"
+        self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
 
         super.init()
         self.connect()
@@ -63,6 +61,8 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 //Mark: Connect
 
     open func connect() {
+        self.receivedDataBuffer.resetBytes(in: NSRange(location: 0, length: self.receivedDataBuffer.length))
+
         var additionalHeaders = self.headers
         if let eventID = self.lastEventID {
             additionalHeaders["Last-Event-Id"] = eventID
@@ -80,12 +80,12 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.urlSession = newSession(configuration)
         self.task = urlSession!.dataTask(with: self.url)
 
-		self.resumeSession()
+        self.resumeSession()
     }
 
-	internal func resumeSession() {
-		self.task!.resume()
-	}
+    internal func resumeSession() {
+        self.task!.resume()
+    }
 
     internal func newSession(_ configuration: URLSessionConfiguration) -> URLSession {
         return URLSession(
@@ -100,19 +100,20 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     open func close() {
         self.readyState = EventSourceState.closed
         self.urlSession?.invalidateAndCancel()
+        self.urlSession = nil
     }
 
-	fileprivate func receivedMessageToClose(_ httpResponse: HTTPURLResponse?) -> Bool {
-		guard let response = httpResponse else {
-			return false
-		}
+    fileprivate func receivedMessageToClose(_ httpResponse: HTTPURLResponse?) -> Bool {
+        guard let response = httpResponse else {
+            return false
+        }
 
-		if response.statusCode == 204 {
-			self.close()
-			return true
-		}
-		return false
-	}
+        if response.statusCode == 204 {
+            self.close()
+            return true
+        }
+        return false
+    }
 
 //Mark: EventListeners
 
@@ -137,22 +138,22 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.eventListeners[event] = handler
     }
 
-	open func removeEventListener(_ event: String) -> Void {
-		self.eventListeners.removeValue(forKey: event)
-	}
+    open func removeEventListener(_ event: String) -> Void {
+        self.eventListeners.removeValue(forKey: event)
+    }
 
-	open func events() -> Array<String> {
-		return Array(self.eventListeners.keys)
-	}
+    open func events() -> Array<String> {
+        return Array(self.eventListeners.keys)
+    }
 
 //MARK: URLSessionDataDelegate
 
     open func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-		if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
-			return
-		}
+        if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
+            return
+        }
 
-		if self.readyState != EventSourceState.open {
+        if self.readyState != EventSourceState.open {
             return
         }
 
@@ -164,9 +165,9 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     open func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         completionHandler(URLSession.ResponseDisposition.allow)
 
-		if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
-			return
-		}
+        if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
+            return
+        }
 
         self.readyState = EventSourceState.open
         if self.onOpenCallback != nil {
@@ -179,7 +180,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     open func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         self.readyState = EventSourceState.closed
 
-		if self.receivedMessageToClose(task.response as? HTTPURLResponse) {
+        if self.receivedMessageToClose(task.response as? HTTPURLResponse) {
             return
         }
 
@@ -219,12 +220,12 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         var events = [String]()
 
         // Find first occurrence of delimiter
-		var searchRange =  NSRange(location: 0, length: receivedDataBuffer.length)
+        var searchRange =  NSRange(location: 0, length: receivedDataBuffer.length)
         while let foundRange = searchForEventInRange(searchRange) {
             // Append event
             if foundRange.location > searchRange.location {
                 let dataChunk = receivedDataBuffer.subdata(
-					with: NSRange(location: searchRange.location, length: foundRange.location - searchRange.location)
+                    with: NSRange(location: searchRange.location, length: foundRange.location - searchRange.location)
                 )
 
                 if let text = String(bytes: dataChunk, encoding: .utf8) {
