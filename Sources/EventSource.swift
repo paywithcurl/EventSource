@@ -1,3 +1,4 @@
+
 //
 //  EventSource.swift
 //  EventSource
@@ -34,7 +35,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     internal var urlSession: Foundation.URLSession?
     internal var task: URLSessionDataTask?
-    internal let receivedDataBuffer: NSMutableData
+    internal var receivedDataBuffer: Data
 
     var event = Dictionary<String, String>()
 
@@ -43,7 +44,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.headers = headers
         self.readyState = EventSourceState.closed
         self.operationQueue = OperationQueue()
-        self.receivedDataBuffer = NSMutableData()
+        self.receivedDataBuffer = Data()
 
         let port = self.url.port != nil ? String(self.url.port!) : ""
         let relativePath = self.url.relativePath
@@ -61,7 +62,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 //Mark: Connect
 
     open func connect() {
-        self.receivedDataBuffer.resetBytes(in: NSRange(location: 0, length: self.receivedDataBuffer.length))
+        self.receivedDataBuffer = Data()
 
         var additionalHeaders = self.headers
         if let eventID = self.lastEventID {
@@ -89,9 +90,9 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     internal func newSession(_ configuration: URLSessionConfiguration) -> URLSession {
         return URLSession(
-            configuration: configuration,
-            delegate: self,
-            delegateQueue: operationQueue
+                configuration: configuration,
+                delegate: self,
+                delegateQueue: operationQueue
         )
     }
 
@@ -199,9 +200,9 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
             if self.hasHttpError(code: urlResponse.statusCode) {
                 theError = NSError(
-                    domain: "com.inaka.eventSource.error",
-                    code: -1,
-                    userInfo: ["message": "HTTP Status Code: \(urlResponse.statusCode)"]
+                        domain: "com.inaka.eventSource.error",
+                        code: -1,
+                        userInfo: ["message": "HTTP Status Code: \(urlResponse.statusCode)"]
                 )
                 self.close()
             }
@@ -220,37 +221,32 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         var events = [String]()
 
         // Find first occurrence of delimiter
-        var searchRange =  NSRange(location: 0, length: receivedDataBuffer.length)
+        var searchRange: Range<Data.Index> = 0..<self.receivedDataBuffer.count
         while let foundRange = searchForEventInRange(searchRange) {
             // Append event
-            if foundRange.location > searchRange.location {
-                let dataChunk = receivedDataBuffer.subdata(
-                    with: NSRange(location: searchRange.location, length: foundRange.location - searchRange.location)
-                )
+            let dataChunk = receivedDataBuffer.subdata(in: searchRange.lowerBound..<foundRange.lowerBound)
 
-                if let text = String(bytes: dataChunk, encoding: .utf8) {
-                    events.append(text)
-                }
+            if let text = String(bytes: dataChunk, encoding: .utf8) {
+                events.append(text)
             }
             // Search for next occurrence of delimiter
-            searchRange.location = foundRange.location + foundRange.length
-            searchRange.length = receivedDataBuffer.length - searchRange.location
+            searchRange = foundRange.upperBound..<searchRange.upperBound
         }
 
+        let rangeToReplace = 0..<searchRange.lowerBound
         // Remove the found events from the buffer
-        self.receivedDataBuffer.replaceBytes(in: NSRange(location: 0, length: searchRange.location), withBytes: nil, length: 0)
+        self.receivedDataBuffer.replaceSubrange(rangeToReplace, with: [])
 
         return events
     }
 
-    fileprivate func searchForEventInRange(_ searchRange: NSRange) -> NSRange? {
+    fileprivate func searchForEventInRange(_ searchRange: Range<Data.Index>) -> Range<Data.Index>? {
         let delimiters = validNewlineCharacters.map { "\($0)\($0)".data(using: String.Encoding.utf8)! }
 
         for delimiter in delimiters {
-            let foundRange = receivedDataBuffer.range(of: delimiter,
-                                                            options: NSData.SearchOptions(),
-                                                            in: searchRange)
-            if foundRange.location != NSNotFound {
+            let foundRange = receivedDataBuffer.range(of: delimiter, in: searchRange)
+
+            if foundRange != nil {
                 return foundRange
             }
         }
