@@ -44,6 +44,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.headers = headers
         self.readyState = EventSourceState.closed
         self.operationQueue = OperationQueue()
+        self.operationQueue.maxConcurrentOperationCount = 1
         self.receivedDataBuffer = Data()
 
         let port = self.url.port != nil ? String(self.url.port!) : ""
@@ -63,7 +64,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     open func connect() {
         self.receivedDataBuffer = Data()
-
+        
         var additionalHeaders = self.headers
         if let eventID = self.lastEventID {
             additionalHeaders["Last-Event-Id"] = eventID
@@ -191,7 +192,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
         if !hasHttpError(code: urlResponse.statusCode) && (error == nil || (error! as NSError).code != -999) {
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(retryTime)) {
-                self.connect()
+                
             }
         }
 
